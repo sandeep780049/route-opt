@@ -5,15 +5,24 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
+import numpy as np
+from numpy.typing import ArrayLike
+
 Point = tuple[float, float]
 
 
-def distance(a: Point, b: Point) -> float:
-    """Euclidean distance between two points."""
-    return math.hypot(a[0] - b[0], a[1] - b[1])
+def distance(a: ArrayLike, b: ArrayLike) -> float:
+    """Euclidean distance between two points.
+
+    Accepts plain tuples/lists and numpy rows alike; both index coordinates
+    positionally, which is exactly what the strategies rely on.
+    """
+    av = np.asarray(a, dtype=np.float64)
+    bv = np.asarray(b, dtype=np.float64)
+    return float(math.hypot(av[0] - bv[0], av[1] - bv[1]))
 
 
-def tour_length(points: Sequence[Point], tour: Sequence[int]) -> float:
+def tour_length(points: ArrayLike, tour: Sequence[int]) -> float:
     """Closed-tour length of ``tour`` over ``points``.
 
     The tour is treated as a cycle: the leg from the last visited point back
@@ -21,12 +30,13 @@ def tour_length(points: Sequence[Point], tour: Sequence[int]) -> float:
     """
     if not tour:
         return 0.0
+    pts = np.asarray(points, dtype=np.float64)
     total = 0.0
     for i in range(len(tour)):
-        a = points[tour[i]]
-        b = points[tour[(i + 1) % len(tour)]]
+        a = pts[tour[i]]
+        b = pts[tour[(i + 1) % len(tour)]]
         total += distance(a, b)
-    return total
+    return float(total)
 
 
 def round_half_up(value: float) -> float:

@@ -6,7 +6,6 @@ import math
 
 import numpy as np
 import pytest
-
 from routeopt.geometry import distance, round_half_up, tour_length
 from routeopt.verify import check_tour
 

@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from routeopt.geometry import tour_length
 from routeopt.tour import (
     Problem,
-    cheapest_insertion,
-    farthest_insertion,
     greedy,
-    nearest_neighbour,
     solve,
     two_opt,
 )
