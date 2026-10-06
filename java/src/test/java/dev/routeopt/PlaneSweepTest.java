@@ -3,7 +3,10 @@ package dev.routeopt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Locale;
+
 import java.util.random.RandomGenerator;
+import java.util.random.RandomGeneratorFactory;
 import org.junit.jupiter.api.Test;
 
 class PlaneSweepTest {
@@ -27,7 +30,7 @@ class PlaneSweepTest {
 
     @Test
     void matchesBruteForceOnRandomClouds() {
-        var rng = RandomGenerator.of("L64X128MixRandom", 2026);
+        var rng = RandomGeneratorFactory.of("L64X128MixRandom").create(2026);
         for (int trial = 0; trial < 25; trial++) {
             int n = 20 + rng.nextInt(80);
             PlaneSweep.Pt[] cloud = new PlaneSweep.Pt[n];
@@ -37,17 +40,22 @@ class PlaneSweepTest {
             double brute = Double.POSITIVE_INFINITY;
             for (int i = 0; i < n; i++) {
                 for (int j = i + 1; j < n; j++) {
-                    brute = Math.min(brute, cloud[i].distanceTo(cloud[j]));
+                    double d = cloud[i].distanceTo(cloud[j]);
+                    if (d < brute) {
+                        brute = d;
+                    }
                 }
             }
-            assertEquals(brute, PlaneSweep.closestPair(cloud), 1e-9,
-                    "trial " + trial + " mismatch");
+            double swept = PlaneSweep.closestPair(cloud);
+            assertEquals(brute, swept, 1e-9,
+                    String.format(Locale.ROOT, "trial %d: brute=%s swept=%s",
+                            trial, brute, swept));
         }
     }
 
     @Test
     void tightPairInLargeCloud() {
-        var rng = RandomGenerator.of("L64X128MixRandom", 7);
+        var rng = RandomGeneratorFactory.of("L64X128MixRandom").create(7);
         PlaneSweep.Pt[] cloud = new PlaneSweep.Pt[500];
         for (int i = 0; i < cloud.length; i++) {
             cloud[i] = pt(i, rng.nextDouble(0, 1000), rng.nextDouble(0, 1000));

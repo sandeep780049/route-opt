@@ -195,7 +195,7 @@ fn parse_number(chars: &[char], pos: &mut usize) -> Result<Json, String> {
 /// shortest round-trip representation produced by `serde`-style formatting.
 pub fn fmt_f64(v: f64) -> String {
     if v == v.trunc() && v.abs() < 1e15 {
-        let mut s = format!("{}", v as i64);
+        let s = format!("{}", v as i64);
         return s;
     }
     let mut s = format!("{v}");

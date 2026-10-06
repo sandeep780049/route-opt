@@ -18,10 +18,9 @@ coverage/
 rust/target/
 **/*.rs.bk
 
-# C++ / CMake build dirs
+# C++ / CMake build dirs + local build output
 cpp/build/
-dist/clonecheck
-dist/java/
+dist/
 
 # Java
 *.class

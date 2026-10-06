@@ -7,7 +7,6 @@
 
 use crate::json::{dump, fmt_f64, parse, Json};
 use std::collections::BTreeMap;
-use std::f64;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
@@ -79,7 +78,7 @@ fn pick_start(n: usize, rng: &mut SplitMix64) -> usize {
     (rng.next_u64() % n as u64) as usize
 }
 
-fn nearest_neighbour(points: &[Point], seed: u64) -> Vec<usize> {
+pub fn nearest_neighbour(points: &[Point], seed: u64) -> Vec<usize> {
     let n = points.len();
     let mut rng = SplitMix64::new(seed);
     let start = pick_start(n, &mut rng);
