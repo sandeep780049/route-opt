@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "routeopt"
+version = "0.1.0"
+description = "Reference implementation of the route-opt solver contract."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[project.scripts]
+routeopt = "routeopt.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["routeopt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

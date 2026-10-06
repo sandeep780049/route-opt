@@ -1,0 +1,18 @@
+{
+  "expect": {
+    "length": 0.0,
+    "tour": [
+      0
+    ]
+  },
+  "name": "single-point",
+  "points": [
+    {
+      "id": 0,
+      "x": 4.2,
+      "y": -1.7
+    }
+  ],
+  "seed": 0,
+  "strategy": "nearest_neighbour"
+}

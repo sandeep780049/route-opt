@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/core/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+ts/dist/
+coverage/
+
+# Rust
+rust/target/
+**/*.rs.bk
+
+# C++ / CMake build dirs
+cpp/build/
+dist/clonecheck
+dist/java/
+
+# Java
+*.class
+target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

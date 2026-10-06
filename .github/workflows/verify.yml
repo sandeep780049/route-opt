@@ -1,0 +1,33 @@
+name: cross-language-verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m pip install -e core
+      - run: cargo build --release --manifest-path rust/Cargo.toml
+      - run: g++ -std=c++14 -I cpp/include -o dist/clonecheck cpp/src/*.cpp
+      - run: npm --prefix ts install
+      - name: regenerate corpus expectations from the reference port
+        run: python scripts/gen_corpus.py --out examples --force
+      - name: run the verifier across ports
+        run: >
+          npm --prefix ts run verify --
+          --python python3
+          --rust ../../rust/target/release/route_engine
+          --cpp ../../dist/clonecheck
+          --corpus ../../examples
+        working-directory: ts
