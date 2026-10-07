@@ -25,9 +25,8 @@ jobs:
         run: python scripts/gen_corpus.py --out examples --force
       - name: run the verifier across ports
         run: >
-          npm --prefix ts run verify --
+          npm run verify --
           --python python3
-          --rust ../../rust/target/release/route_engine
-          --cpp ../../dist/clonecheck
-          --corpus ../../examples
+          --rust ../rust/target/release/route_engine
+          --corpus ../examples
         working-directory: ts

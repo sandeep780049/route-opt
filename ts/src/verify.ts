@@ -8,9 +8,9 @@
  *    equals the length recomputed from its tour ids;
  *  - deterministic strategies (`two_opt`, `greedy`) must reproduce the
  *    embedded `expect` answer exactly (same tour ids, same length);
- *  - seeded strategies must agree across the SplitMix64 ports (rust, cpp, ts,
- *    java); Python uses its own numpy stream and is validated for correctness
- *    only.
+ *  - seeded strategies must agree across the SplitMix64 solver ports. Rust is
+ *    the only one wired up so far (see README roadmap); Python uses its own
+ *    numpy stream and is validated for correctness only.
  */
 
 import { spawnSync } from "node:child_process";
