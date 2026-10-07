@@ -214,7 +214,7 @@ fn greedy(points: &[Point]) -> Vec<usize> {
         let next = adj[&cur]
             .iter()
             .copied()
-            .find(|&&w| w as i64 != prev)
+            .find(|&w| w as i64 != prev)
             .expect("path continues");
         prev = cur as i64;
         tour.push(next);

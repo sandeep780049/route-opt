@@ -1,26 +1,42 @@
 /**
  * Cross-language contract verifier.
  *
- * Usage: tsx src/verify.ts [--python <bin>] [--rust <dir>] [--cpp <bin>] [--corpus <dir>]
+ * Usage: tsx src/verify.ts [--python <cmd>] [--rust <bin>] [--cpp <bin>] [--corpus <dir>]
  *
- * 1. enumerates examples/*.json,
- * 2. runs the Python reference CLI (always present),
- * 3. runs optional ports passed as paths/flags,
- * 4. compares every answer against the embedded expectation and reports
- *    agreement per port.
+ * Rules (see docs/contract.md):
+ *  - every port must emit a valid Hamiltonian cycle whose stated `length`
+ *    equals the length recomputed from its tour ids;
+ *  - deterministic strategies (`two_opt`, `greedy`) must reproduce the
+ *    embedded `expect` answer exactly (same tour ids, same length);
+ *  - seeded strategies must agree across the SplitMix64 ports (rust, cpp, ts,
+ *    java); Python uses its own numpy stream and is validated for correctness
+ *    only.
  */
 
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseScenario, roundHalfUp, tourLength, type Scenario } from "./scenario.js";
+import {
+  checkTour,
+  parseScenario,
+  roundHalfUp,
+  tourLength,
+  type Scenario,
+} from "./scenario.js";
 
 interface PortSpec {
   readonly name: string;
   readonly command: string;
   readonly args: readonly string[];
 }
+
+interface PortAnswer {
+  readonly tour: number[];
+  readonly length: number;
+}
+
+const DETERMINISTIC = new Set(["two_opt", "greedy"]);
 
 function parseArgs(argv: readonly string[]): Map<string, string> {
   const opts = new Map<string, string>();
@@ -53,7 +69,7 @@ function runPort(port: PortSpec, scenarioPath: string): string {
   return proc.stdout;
 }
 
-function extractAnswer(stdout: string): { tour: number[]; length: number } {
+function extractAnswer(stdout: string): PortAnswer {
   const start = stdout.indexOf("{");
   const end = stdout.lastIndexOf("}");
   if (start === -1 || end <= start) {
@@ -70,6 +86,22 @@ function extractAnswer(stdout: string): { tour: number[]; length: number } {
     tour: parsed.tour.map(Number),
     length: Number(parsed.length ?? NaN),
   };
+}
+
+function toursEqual(a: readonly number[], b: readonly number[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function validAnswer(scenario: Scenario, answer: PortAnswer): string | null {
+  const checks = checkTour(scenario.points, answer.tour);
+  if (!checks.visitedOnce || !checks.closesCycle) {
+    return "not a Hamiltonian cycle";
+  }
+  const recomputed = roundHalfUp(tourLength(scenario.points, answer.tour));
+  if (Math.abs(recomputed - answer.length) >= 1e-9) {
+    return `length ${answer.length} != recomputed ${recomputed}`;
+  }
+  return null;
 }
 
 function main(): number {
@@ -103,36 +135,86 @@ function main(): number {
     return 2;
   }
 
-  let failures = 0;
   const rows: string[] = [];
+  let failures = 0;
+  const fail = (scenario: string, port: string, detail: string) => {
+    failures++;
+    rows.push(`FAIL  ${scenario.padEnd(24)}  ${port.padEnd(8)}  ${detail}`);
+  };
+  const pass = (scenario: string, port: string, detail: string) => {
+    rows.push(`PASS  ${scenario.padEnd(24)}  ${port.padEnd(8)}  ${detail}`);
+  };
+
   for (const scenario of scenarios) {
     const scenarioPath = join(corpusDir, `${scenario.name}.json`);
+
+    // collect answers, reporting hard failures (port crashed / bad JSON)
+    const answers = new Map<string, PortAnswer>();
     for (const port of ports) {
-      let ok = false;
-      let detail = "";
       try {
-        const answer = extractAnswer(runPort(port, scenarioPath));
-        const recomputed = roundHalfUp(tourLength(scenario.points, answer.tour));
-        const checks = { visitedOnce: true, closesCycle: true, finiteLength: true };
-        allChecks: do {
-          if (!checks.visitedOnce) break allChecks;
-          if (!checks.closesCycle) break allChecks;
-          if (!checks.finiteLength) break allChecks;
-          const ids = new Set(scenario.points.map((p) => p.id));
-          ok =
-            answer.tour.length === ids.size &&
-            new Set(answer.tour).size === ids.size &&
-            ids.size === [...ids].length &&
-            Math.abs(recomputed - answer.length) < 1e-9;
-        } while (false);
-        detail = `tour=${answer.tour.length} len=${answer.length} recomp=${recomputed}`;
+        answers.set(port.name, extractAnswer(runPort(port, scenarioPath)));
       } catch (err) {
-        detail = err instanceof Error ? err.message : String(err);
+        fail(scenario.name, port.name, err instanceof Error ? err.message : String(err));
       }
-      if (!ok) failures++;
-      rows.push(
-        `${ok ? "PASS" : "FAIL"}  ${scenario.name.padEnd(24)}  ${port.name.padEnd(8)}  ${detail}`,
+    }
+
+    // rule 1: every answer is a valid, self-consistent Hamiltonian cycle
+    for (const port of ports) {
+      const answer = answers.get(port.name);
+      if (!answer) continue;
+      const problem = validAnswer(scenario, answer);
+      if (problem) {
+        fail(scenario.name, port.name, problem);
+        continue;
+      }
+
+      // rule 2: deterministic strategies must reproduce the embedded answer
+      if (DETERMINISTIC.has(scenario.strategy)) {
+        const tourEq = toursEqual(answer.tour, scenario.expect.tour);
+        const lenEq = Math.abs(answer.length - scenario.expect.length) < 1e-9;
+        if (tourEq && lenEq) {
+          pass(scenario.name, port.name, `matches expectation (${answer.length})`);
+        } else {
+          fail(
+            scenario.name,
+            port.name,
+            `tour/length diverge from expectation (${scenario.expect.length})`,
+          );
+        }
+        continue;
+      }
+
+      // rule 3 (final verdict below): seeded strategies must agree across the
+      // SplitMix64 ports; python is validated above but uses its own stream
+      if (port.name === "python") {
+        pass(scenario.name, port.name, `reference stream, len=${answer.length}`);
+      } else {
+        pass(scenario.name, port.name, `len=${answer.length}`);
+      }
+    }
+
+    // rule 3: cross-port agreement for seeded strategies (non-python ports)
+    if (!DETERMINISTIC.has(scenario.strategy)) {
+      const splitMixPorts = ports.filter(
+        (p) => p.name !== "python" && answers.has(p.name),
       );
+      if (splitMixPorts.length >= 2) {
+        const [anchor, ...others] = splitMixPorts;
+        const anchorAnswer = answers.get(anchor!.name)!;
+        for (const p of others!) {
+          const ans = answers.get(p!.name)!;
+          if (
+            !toursEqual(ans.tour, anchorAnswer.tour) ||
+            Math.abs(ans.length - anchorAnswer.length) >= 1e-9
+          ) {
+            fail(
+              scenario.name,
+              p!.name,
+              `disagrees with ${anchor!.name} (len ${ans.length} vs ${anchorAnswer.length})`,
+            );
+          }
+        }
+      }
     }
   }
 
